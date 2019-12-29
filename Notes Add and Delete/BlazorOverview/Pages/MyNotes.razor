@@ -1,0 +1,63 @@
+﻿@using BlazorOverview.Models
+
+<h3>我的記事</h3>
+
+@*這裡是 HTML 的標記宣告*@
+<table class="table">
+    <thead>
+        <tr>
+            <th>事項</th>
+            <th>修改</th>
+            <th>刪除</th>
+        </tr>
+    </thead>
+    <tbody>
+        @*列出集合清單中的每一筆紀錄到 HTML Table 內*@
+        @foreach (var NoteItem in Notes)
+        {
+            <tr>
+                @*透過資料綁定，把集合清單內的紀錄屬性，顯示在網頁上*@
+                <td>@NoteItem.Title</td>
+                @*這個按鈕尚未進行任何設計*@
+                <td><input type="button" class="btn btn-primary" value="修改" /></td>
+                <td>
+                    @*透過 Blazor 的資料綁定，將刪除按鈕的點選事件，綁定到 C# 的委派處理方法*@
+                    <input type="button" class="btn btn-danger" value="刪除"
+                           @onclick="()=>Delete(NoteItem)" />
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+<div>
+    @*透過 Blazor 的資料綁定，將新增按鈕的點選事件，綁定到 C# 的委派處理方法*@
+    <input type="button" class="btn btn-primary" @onclick="Add" value="新增" />
+</div>
+
+@code {
+    // 儲存要顯示的集合清單內的所有紀錄
+    public List<MyNote> Notes { get; set; } = new List<MyNote>();
+
+    // 元件建立的時候，所要執行的初始化工作
+    protected override void OnInitialized()
+    {
+        // 預設建立的集合清單紀錄
+        Notes = new List<MyNote>()
+        {
+            new MyNote { Title= "買蘋果" },
+            new MyNote { Title="買西瓜" }
+        };
+    }
+    // 新增按鈕的點選事件之處理委派方法
+    private void Add()
+    {
+        //加入一筆紀錄到集合清單內
+        Notes.Add(new MyNote { Title = $"新事項 {DateTime.Now.ToString()}" });
+    }
+    // 刪除按鈕的點選事件之處理委派方法
+    private void Delete(MyNote note)
+    {
+        //從集合清單中刪除所選擇的紀錄
+        Notes.Remove(note);
+    }
+}
