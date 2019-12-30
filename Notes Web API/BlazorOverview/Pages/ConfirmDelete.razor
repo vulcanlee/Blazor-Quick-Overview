@@ -1,0 +1,37 @@
+﻿@inject IModalService ModalService
+
+<div class="simple-form">
+
+    <div class="form-group">
+        <p>請確認是否要刪除這筆 @RecordTitleName 資料</p>
+    </div>
+
+    <button @onclick="SubmitForm" class="btn btn-danger">刪除</button>
+    <button @onclick="Cancel" class="btn btn-secondary">取消</button>
+</div>
+
+@code {
+    [CascadingParameter] ModalParameters Parameters { get; set; }
+    [CascadingParameter] BlazoredModal BlazoredModal { get; set; }
+
+    // 這筆記事的名稱
+    string RecordTitleName { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // 透過傳遞來的參數，取得當前記事的名稱
+        RecordTitleName = Parameters.Get<string>("RecordTitleName");
+    }
+
+    void SubmitForm()
+    {
+        //使用者確定要刪除，回應 ModalResult.Ok
+        ModalService.Close(ModalResult.Ok($"RecordTitleName {RecordTitleName} was submitted successfully."));
+    }
+
+    void Cancel()
+    {
+        //使用者取消刪除，回應 ModalResult.Close
+        ModalService.Close(ModalResult.Cancel());
+    }
+}
