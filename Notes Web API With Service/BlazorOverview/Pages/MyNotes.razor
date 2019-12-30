@@ -1,0 +1,190 @@
+﻿@using BlazorOverview.Models
+
+@*加入要使用 BlazorOverview.Services 命名空間的 API*@
+@using BlazorOverview.Services
+@*當這個 Blazor 元件建立之後，要注入這個 IMyNoteService 抽象型別的具體實作物件*@
+@inject IMyNoteService MyNoteService
+@*注入這個物件，使得在 Blazor 元件內，可以使用 C# 呼叫 JavaScript*@
+@inject IJSRuntime jsRuntime
+@*注入 Blazored Modal 元件的實作物件*@
+@inject IModalService Modal
+
+<h3>我的記事</h3>
+
+@*這裡是 HTML 的標記宣告*@
+<table class="table">
+    <thead>
+        <tr>
+            <th>事項</th>
+            <th>修改</th>
+            <th>刪除</th>
+        </tr>
+    </thead>
+    <tbody>
+        @*列出集合清單中的每一筆紀錄到 HTML Table 內*@
+        @foreach (var NoteItem in Notes)
+        {
+            <tr>
+                @*透過資料綁定，把集合清單內的紀錄屬性，顯示在網頁上*@
+                <td>@NoteItem.Title</td>
+                <td>
+                    @*透過 Blazor 的資料綁定，將修改按鈕的點選事件，綁定到 C# 的委派處理方法*@
+                    @*當該修改按鈕點選事件被觸發的時候，將會把現在顯示的紀錄物件傳送過去*@
+                    <input type="button" class="btn btn-primary" value="修改"
+                           @onclick="()=>Update(NoteItem)" />
+                </td>
+                <td>
+                    @*透過 Blazor 的資料綁定，將刪除按鈕的點選事件，綁定到 C# 的委派處理方法*@
+                    <input type="button" class="btn btn-danger" value="刪除"
+                           @onclick="()=>Delete(NoteItem)" />
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+<div>
+    @*透過 Blazor 的資料綁定，將新增按鈕的點選事件，綁定到 C# 的委派處理方法*@
+    <input type="button" class="btn btn-primary" @onclick="Add" value="新增" />
+</div>
+
+@*這裡的 BootStrap 對話窗，將會透過使用 C# 呼叫 jQuery 來顯示與關閉 *@
+<div class="modal" tabindex="-1" role="dialog" id="@DialogIdName">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">記事項目</h5>
+                <button type="button" class="close" @onclick="CloseDialog">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-9">
+                        <div class="row p-2">
+                            <EditForm Model="@CurrentMyNote" OnValidSubmit="@HandleValidSubmit">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary />
+                                <div class="form-group">
+                                    <label for="taskName">Task Name</label>
+                                    <InputText id="name" class="form-control" @bind-Value="@CurrentMyNote.Title" />
+                                </div>
+                                <button type="submit" class="btn btn-primary">儲存</button>
+                            </EditForm>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    // 儲存要顯示的集合清單內的所有紀錄
+    public List<MyNote> Notes { get; set; } = new List<MyNote>();
+
+    // 正在編輯或者新增的紀錄物件
+    public MyNote CurrentMyNote { get; set; } = new MyNote();
+    // 記錄下修改前的紀錄物件
+    public MyNote OrigMyNote { get; set; } = new MyNote();
+    // 是否要顯示新增或修改對話窗
+    public bool ShowPopup { get; set; } = false;
+    // 這次處理的紀錄是否為新增，若該屬性為 false，則表示這次要修改紀錄
+    public bool IsNewMode { get; set; }
+    // 要顯示該新增與修改對話窗的 Id 名稱
+    public string DialogIdName { get; set; } = "myModal";
+
+    // 元件建立的時候，所要執行的初始化工作，這裡使用非同步方式來呼叫
+    protected override async Task OnInitializedAsync()
+    {
+        // 透過 IMyNoteService.RetriveAsync() 方法，來取得所有記事清單
+        Notes = await MyNoteService.RetriveAsync();
+    }
+    // 刪除按鈕的點選事件之處理委派方法
+    private void Delete(MyNote note)
+    {
+        CurrentMyNote = note;
+        var parameters = new ModalParameters();
+        // 宣告要傳遞給刪除對話窗的參數
+        parameters.Add("RecordTitleName", note.Title);
+
+        // 綁定使用者關閉對話窗的觸發事件
+        Modal.OnClose += ModalClosed;
+        // 顯示這個刪除對話窗
+        Modal.Show<ConfirmDelete>("確認要刪除嗎？", parameters);
+    }
+    // 刪除對話窗的事件被觸發所要執行的委派方法
+    async void ModalClosed(ModalResult modalResult)
+    {
+        // 檢查使用者是否有點選確認按鈕
+        if (modalResult.Cancelled)
+        {
+            Console.WriteLine("Modal was Cancelled");
+        }
+        else
+        {
+            // 若使用者點選了確定按鈕
+            Console.WriteLine(modalResult.Data.ToString());
+            await DeleteIt(CurrentMyNote);
+            StateHasChanged();
+        }
+        //解除該對話窗所綁定的事件
+        Modal.OnClose -= ModalClosed;
+    }
+    // 刪除這個筆記事紀錄
+    private async Task DeleteIt(MyNote note)
+    {
+        // 透過 IMyNoteService.DeleteAsync() 方法，從集合清單中刪除所選擇的紀錄
+        await MyNoteService.DeleteAsync(note);
+        Notes = await MyNoteService.RetriveAsync();
+    }
+
+    // 新增按鈕的點選事件之處理委派方法
+    private async void Add()
+    {
+        // 設定此次要進行新增一筆紀錄
+        IsNewMode = true;
+        //產生要新增的紀錄物件
+        CurrentMyNote = new MyNote();
+        // 顯示新增紀錄使用的對話窗
+        await jsRuntime.InvokeAsync<object>("ShowModal", DialogIdName);
+    }
+    // 修改按鈕的點選事件之處理委派方法
+    private async void Update(MyNote note)
+    {
+        // 設定此次要進行修改紀錄
+        IsNewMode = false;
+        CurrentMyNote = OrigMyNote = note.Clone();
+        //產生一個物件副本，做為要修改的紀錄物件
+        CurrentMyNote = note.Clone();
+        //保存此次要修改的紀錄物件
+        OrigMyNote = note;
+        // 顯示新增紀錄使用的對話窗
+        await jsRuntime.InvokeAsync<object>("ShowModal", DialogIdName);
+    }
+    // 關閉對話窗的方法
+    private async void CloseDialog()
+    {
+        // 設定要關閉對話窗的變數，讓對話窗的 HTML 標記不會顯示在瀏覽器畫面上
+        await jsRuntime.InvokeAsync<object>("CloseModal", DialogIdName);
+    }
+    // 當使用者連完資料資料且點選 儲存 按鈕之後，若沒有錯誤產生，就會觸發此委派方法
+    private async void HandleValidSubmit()
+    {
+        // 設定要關閉對話窗的變數，讓對話窗的 HTML 標記不會顯示在瀏覽器畫面上
+        await jsRuntime.InvokeAsync<object>("CloseModal", DialogIdName);
+        //判斷此次動作是要新增還是要修改紀錄
+        if (IsNewMode == true)
+        {
+            // 透過 IMyNoteService.CreateAsync() 方法，加入一筆紀錄到集合清單內
+            await MyNoteService.CreateAsync(CurrentMyNote);
+        }
+        else
+        {
+            // 透過 IMyNoteService.UpdateAsync() 方法，修改該紀錄
+            await MyNoteService.UpdateAsync(OrigMyNote, CurrentMyNote);
+        }
+        // 透過 IMyNoteService.RetriveAsync() 方法，來取得所有記事清單
+        Notes = await MyNoteService.RetriveAsync();
+        StateHasChanged();
+    }
+}
